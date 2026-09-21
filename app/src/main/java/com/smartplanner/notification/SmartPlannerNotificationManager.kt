@@ -102,6 +102,30 @@ class SmartPlannerNotificationManager @Inject constructor(
         }
     }
 
+    /**
+     * Shows a gentle notification when the Weekly Coach Review is ready.
+     */
+    fun sendWeeklyReviewNotification(title: String, message: String): Boolean {
+        if (!hasNotificationPermission()) return false
+
+        val notificationId = 99991
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(message)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+            return true
+        } catch (e: SecurityException) {
+            return false
+        }
+    }
+
     private fun createCheckInPendingIntent(
         habitId: String,
         status: CheckInStatus,
