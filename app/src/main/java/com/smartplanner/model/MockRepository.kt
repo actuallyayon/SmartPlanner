@@ -28,28 +28,36 @@ class MockRepository @Inject constructor() : Repository {
             title = "Daily Spanish Vocabulary",
             trigger = "Right after breakfast",
             minVersion = "5 minutes of flashcard review",
-            aiReasoning = "Building vocabulary is essential for learning Spanish, and starting small helps create a consistent habit."
+            aiReasoning = "Building vocabulary is essential for learning Spanish, and starting small helps create a consistent habit.",
+            anchorType = AnchorType.FIRST_UNLOCK,
+            anchorConfig = AnchorConfig(clockTimeString = "08:00", quietHoursStartHour = 22, quietHoursEndHour = 7, cooldownMinutes = 120)
         ),
         Habit(
             id = "h_app",
             title = "Spanish Language Learning App",
             trigger = "During daily commute",
             minVersion = "10 minutes of interactive lessons",
-            aiReasoning = "Utilizing commute time for learning Spanish helps maximize available time and creates a consistent daily routine."
+            aiReasoning = "Utilizing commute time for learning Spanish helps maximize available time and creates a consistent daily routine.",
+            anchorType = AnchorType.HEADPHONES_CONNECTED,
+            anchorConfig = AnchorConfig(clockTimeString = "09:00", quietHoursStartHour = 22, quietHoursEndHour = 7, cooldownMinutes = 120)
         ),
         Habit(
             id = "h_podcast",
             title = "Spanish Podcast Listening",
             trigger = "Right before bed",
             minVersion = "10 minutes of listening to a beginner-friendly podcast",
-            aiReasoning = "Consistent input of spoken Spanish right before sleep helps reinforce vocabulary and listening comprehension."
+            aiReasoning = "Consistent input of spoken Spanish right before sleep helps reinforce vocabulary and listening comprehension.",
+            anchorType = AnchorType.CHARGING_STARTED,
+            anchorConfig = AnchorConfig(clockTimeString = "21:30", quietHoursStartHour = 23, quietHoursEndHour = 6, cooldownMinutes = 120)
         ),
         Habit(
             id = "h_speaking",
             title = "Spanish Speaking Practice",
             trigger = "While preparing dinner",
             minVersion = "5 minutes of speaking aloud to yourself",
-            aiReasoning = "Speaking aloud even for a few minutes daily builds confidence and speaking fluency."
+            aiReasoning = "Speaking aloud even for a few minutes daily builds confidence and speaking fluency.",
+            anchorType = AnchorType.ARRIVED_HOME,
+            anchorConfig = AnchorConfig(clockTimeString = "18:00", latitude = 37.7749, longitude = -122.4194, radiusMeters = 100f, quietHoursStartHour = 22, quietHoursEndHour = 7, cooldownMinutes = 120)
         )
     )
 
@@ -59,35 +67,45 @@ class MockRepository @Inject constructor() : Repository {
             title = "Review Lecture Notes",
             trigger = "At 10:00 AM",
             minVersion = "15 minutes review",
-            aiReasoning = "Immediate review of daily concepts prevents long-term cramming and solidifies knowledge."
+            aiReasoning = "Immediate review of daily concepts prevents long-term cramming and solidifies knowledge.",
+            anchorType = AnchorType.CLOCK_TIME,
+            anchorConfig = AnchorConfig(clockTimeString = "10:00", quietHoursStartHour = 22, quietHoursEndHour = 7, cooldownMinutes = 120)
         ),
         Habit(
             id = "h_ex2",
             title = "Solve Practice Questions",
             trigger = "Right after lunch",
             minVersion = "2 problems",
-            aiReasoning = "Application-based learning is the highest-leverage way to prepare for technical exams."
+            aiReasoning = "Application-based learning is the highest-leverage way to prepare for technical exams.",
+            anchorType = AnchorType.FIRST_UNLOCK,
+            anchorConfig = AnchorConfig(clockTimeString = "13:30", quietHoursStartHour = 22, quietHoursEndHour = 7, cooldownMinutes = 120)
         ),
         Habit(
             id = "h_ex3",
             title = "Active Recall Session",
             trigger = "Before dinner",
             minVersion = "10 minutes of self-testing",
-            aiReasoning = "Forcing active recall strengthens neural pathways more than passive reading."
+            aiReasoning = "Forcing active recall strengthens neural pathways more than passive reading.",
+            anchorType = AnchorType.ARRIVED_HOME,
+            anchorConfig = AnchorConfig(clockTimeString = "17:30", latitude = 37.7749, longitude = -122.4194, radiusMeters = 100f, quietHoursStartHour = 22, quietHoursEndHour = 7, cooldownMinutes = 120)
         ),
         Habit(
             id = "h_ex4",
             title = "Clarify Unresolved Topics",
             trigger = "At the end of the day",
             minVersion = "Write down 1 question to look up",
-            aiReasoning = "Cataloging uncertainty prevents conceptual blind spots from compounding."
+            aiReasoning = "Cataloging uncertainty prevents conceptual blind spots from compounding.",
+            anchorType = AnchorType.CHARGING_STARTED,
+            anchorConfig = AnchorConfig(clockTimeString = "22:00", quietHoursStartHour = 23, quietHoursEndHour = 6, cooldownMinutes = 120)
         ),
         Habit(
             id = "h_ex5",
             title = "Deep Work Session",
             trigger = "9:00 AM in the library",
             minVersion = "30 minutes focused study",
-            aiReasoning = "Establishing a specific study environment primes the brain for deep concentration."
+            aiReasoning = "Establishing a specific study environment primes the brain for deep concentration.",
+            anchorType = AnchorType.HEADPHONES_CONNECTED,
+            anchorConfig = AnchorConfig(clockTimeString = "09:00", quietHoursStartHour = 22, quietHoursEndHour = 7, cooldownMinutes = 120)
         )
     )
 
@@ -277,6 +295,46 @@ class MockRepository @Inject constructor() : Repository {
         checkInsFlow.value = currentMap
     }
 
+    override fun updateHabitAnchor(habitId: String, anchorType: AnchorType, anchorConfig: AnchorConfig?) {
+        val updatedPlans = plansFlow.value.map { plan ->
+            val updatedHabits = plan.habits.map { habit ->
+                if (habit.id == habitId) {
+                    habit.copy(anchorType = anchorType, anchorConfig = anchorConfig ?: habit.anchorConfig)
+                } else {
+                    habit
+                }
+            }
+            plan.copy(habits = updatedHabits)
+        }
+        plansFlow.value = updatedPlans
+    }
+
+    override fun recordHabitReminderFired(habitId: String, timestamp: Long, dateStr: String) {
+        val updatedPlans = plansFlow.value.map { plan ->
+            val updatedHabits = plan.habits.map { habit ->
+                if (habit.id == habitId) {
+                    habit.copy(lastReminderTimestamp = timestamp, lastReminderDate = dateStr)
+                } else {
+                    habit
+                }
+            }
+            plan.copy(habits = updatedHabits)
+        }
+        plansFlow.value = updatedPlans
+    }
+
+    override fun getHabitById(habitId: String): Habit? {
+        return plansFlow.value.flatMap { it.habits }.find { it.id == habitId }
+    }
+
+    override fun updateHabit(habit: Habit) {
+        val updatedPlans = plansFlow.value.map { plan ->
+            val updatedHabits = plan.habits.map { if (it.id == habit.id) habit else it }
+            plan.copy(habits = updatedHabits)
+        }
+        plansFlow.value = updatedPlans
+    }
+
     override fun getProgressPoints(): Flow<List<ProgressPoint>> {
         // Compute consistency score over the last 14 days based on actual checkInsFlow
         return checkInsFlow.map { checkInsMap ->
@@ -315,6 +373,24 @@ class MockRepository @Inject constructor() : Repository {
             }
             points
         }
+    }
+
+    // Flow for latest AI Feedback Banner
+    private val latestAiFeedbackFlow = MutableStateFlow<com.smartplanner.model.ai.AiFeedback?>(
+        com.smartplanner.model.ai.AiFeedback(
+            title = "✨ Welcome back!",
+            message = "Your anchor habits are ready for today. Remember: even completing 1 minute or a mini-version builds lasting momentum. You're doing great!"
+        )
+    )
+
+    override fun getLatestAiFeedback(): Flow<com.smartplanner.model.ai.AiFeedback?> = latestAiFeedbackFlow
+
+    override fun saveAiFeedback(feedback: com.smartplanner.model.ai.AiFeedback) {
+        latestAiFeedbackFlow.value = feedback
+    }
+
+    override fun dismissAiFeedback() {
+        latestAiFeedbackFlow.value = null
     }
 
     // Helper to get active habits synchronously for progress calculation

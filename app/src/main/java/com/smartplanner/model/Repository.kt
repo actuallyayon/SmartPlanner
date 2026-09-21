@@ -24,6 +24,17 @@ interface Repository {
     fun getCheckInsForDate(date: String): Flow<List<CheckIn>>
     fun saveCheckIn(habitId: String, date: String, status: CheckInStatus, note: String?)
 
+    // Anchor & Habit Operations
+    fun updateHabitAnchor(habitId: String, anchorType: AnchorType, anchorConfig: AnchorConfig?)
+    fun recordHabitReminderFired(habitId: String, timestamp: Long, dateStr: String)
+    fun getHabitById(habitId: String): Habit?
+    fun updateHabit(habit: Habit)
+
     // Progress Operations
     fun getProgressPoints(): Flow<List<ProgressPoint>>
+
+    // AI Daily Feedback Operations
+    fun getLatestAiFeedback(): Flow<com.smartplanner.model.ai.AiFeedback?>
+    fun saveAiFeedback(feedback: com.smartplanner.model.ai.AiFeedback)
+    fun dismissAiFeedback()
 }
