@@ -23,6 +23,30 @@ data class HabitPlan(
 )
 
 /**
+ * Anchor types representing context-aware device signals or scheduled time.
+ */
+enum class AnchorType(val displayName: String, val description: String) {
+    CHARGING_STARTED("Phone Charging Started", "Triggers when device is plugged into power"),
+    HEADPHONES_CONNECTED("Headphones Connected", "Triggers when headphones/earbuds are plugged in"),
+    ARRIVED_HOME("Arrived Home", "Triggers when entering your home geofence area"),
+    FIRST_UNLOCK("First Screen Unlock", "Triggers when unlocking your device in the morning"),
+    CLOCK_TIME("Clock Time (Fallback)", "Triggers at a specific scheduled time")
+}
+
+/**
+ * Configuration options for context-aware habit anchors and rule enforcement.
+ */
+data class AnchorConfig(
+    val clockTimeString: String = "08:00", // "HH:mm"
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val radiusMeters: Float = 100f,
+    val quietHoursStartHour: Int = 22, // 10 PM (22:00)
+    val quietHoursEndHour: Int = 7,   // 7 AM (07:00)
+    val cooldownMinutes: Long = 120L   // 2 hours minimum cooldown
+)
+
+/**
  * Individual habit item anchored to a specific real-world trigger.
  */
 data class Habit(
@@ -31,6 +55,10 @@ data class Habit(
     val trigger: String,
     val minVersion: String,
     val aiReasoning: String,
+    val anchorType: AnchorType = AnchorType.CLOCK_TIME,
+    val anchorConfig: AnchorConfig? = null,
+    val lastReminderTimestamp: Long? = null,
+    val lastReminderDate: String? = null
 )
 
 /**
