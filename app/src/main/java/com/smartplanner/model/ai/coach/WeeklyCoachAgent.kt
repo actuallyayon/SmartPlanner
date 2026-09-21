@@ -2,6 +2,8 @@ package com.smartplanner.model.ai.coach
 
 import com.smartplanner.model.AgentStepLog
 import com.smartplanner.model.ChangeType
+import com.smartplanner.model.CheckIn
+import com.smartplanner.model.CheckInStatus
 import com.smartplanner.model.ProposedChange
 import com.smartplanner.model.WeeklyReview
 import java.time.LocalDate
@@ -38,7 +40,7 @@ class WeeklyCoachAgent(
         var currentStep = 1
 
         // Step 1: Query Check-Ins
-        val checkIns = coachTools.getWeeklyCheckIns(7)
+        val checkIns: List<CheckIn> = coachTools.getWeeklyCheckIns(7)
         trace.add(
             AgentStepLog(
                 stepNumber = currentStep++,
@@ -68,7 +70,7 @@ class WeeklyCoachAgent(
             if (currentStep >= maxSteps) break
 
             val habitCheckIns = checkIns.filter { it.habitId == habit.id }
-            val skippedCount = habitCheckIns.count { it.status.name == "SKIPPED" }
+            val skippedCount = habitCheckIns.count { it.status == CheckInStatus.SKIPPED }
 
             if (skippedCount >= 2 && habit.minVersion.isNotBlank()) {
                 val simResult = coachTools.runSimulation(habit.id, ChangeType.SHRINK_TO_MIN)
@@ -95,9 +97,9 @@ class WeeklyCoachAgent(
             }
         }
 
-        val completed = checkIns.count { it.status.name == "DONE" }
-        val partial = checkIns.count { it.status.name == "PARTIAL" }
-        val skipped = checkIns.count { it.status.name == "SKIPPED" }
+        val completed = checkIns.count { it.status == CheckInStatus.DONE }
+        val partial = checkIns.count { it.status == CheckInStatus.PARTIAL }
+        val skipped = checkIns.count { it.status == CheckInStatus.SKIPPED }
 
         return WeeklyReview(
             startDate = today.minusDays(6).toString(),

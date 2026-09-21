@@ -65,14 +65,14 @@ class WeeklyReviewController @Inject constructor(
                         // Keeps existing habit with minVersion focus
                     }
                     ChangeType.CHANGE_ANCHOR -> {
-                        val anchorType = runCatching { AnchorType.valueOf(proposal.newValue) }.getOrDefault(AnchorType.HEADPHONES_PLUGGED)
-                        repository.updateHabitAnchor(proposal.habitId, AnchorConfig(type = anchorType, isEnabled = true))
+                        val anchorType = runCatching { AnchorType.valueOf(proposal.newValue) }.getOrDefault(AnchorType.HEADPHONES_CONNECTED)
+                        repository.updateHabitAnchor(proposal.habitId, anchorType, habit.anchorConfig ?: AnchorConfig())
                     }
                     ChangeType.PAUSE_HABIT -> {
-                        // Marked as inactive in a production DB
+                        // Marked as inactive in future updates
                     }
                     ChangeType.GROW_TARGET -> {
-                        // Title or target increment
+                        // Level up target
                     }
                 }
             }

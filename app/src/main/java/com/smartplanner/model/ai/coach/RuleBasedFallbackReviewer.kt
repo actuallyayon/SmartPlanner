@@ -79,12 +79,12 @@ class RuleBasedFallbackReviewer(
                 proposedChanges.add(proposal)
             }
             // Heuristic B: Clock Time Anchor with High Misses -> Propose Context Anchor
-            else if (skipped >= 2 && habit.anchorConfig.type == AnchorType.CLOCK_TIME) {
+            else if (skipped >= 2 && habit.anchorType == AnchorType.CLOCK_TIME) {
                 val sim = coachTools.runSimulation(habit.id, ChangeType.CHANGE_ANCHOR)
                 val proposal = coachTools.proposeChange(
                     habitId = habit.id,
                     changeType = ChangeType.CHANGE_ANCHOR,
-                    newValue = AnchorType.HEADPHONES_PLUGGED.name,
+                    newValue = AnchorType.HEADPHONES_CONNECTED.displayName,
                     reason = "Fixed time alarms are easily overlooked. Anchoring to your headphones creates a natural habit cue.",
                     expectedImpact = "Projected trigger match rate: ${(sim.projectedSuccessRate * 100).toInt()}%"
                 )

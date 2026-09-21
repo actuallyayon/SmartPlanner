@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.smartplanner.model.MockRepository
+import com.smartplanner.model.Repository
 import com.smartplanner.model.ai.coach.DefaultCoachTools
 import com.smartplanner.model.ai.coach.RuleBasedFallbackReviewer
 
@@ -18,7 +19,7 @@ class WeeklyReviewWorker(
 
     override suspend fun doWork(): Result {
         return try {
-            val repository = MockRepository
+            val repository: Repository = MockRepository()
             val tools = DefaultCoachTools(repository)
             val reviewer = RuleBasedFallbackReviewer(tools)
             val review = reviewer.generateWeeklyReview()

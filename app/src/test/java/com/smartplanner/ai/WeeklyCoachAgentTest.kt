@@ -3,11 +3,15 @@ package com.smartplanner.ai
 import com.smartplanner.model.AnchorConfig
 import com.smartplanner.model.AnchorType
 import com.smartplanner.model.ChangeType
-import com.smartplanner.model.CheckInRecord
+import com.smartplanner.model.CheckIn
 import com.smartplanner.model.CheckInStatus
 import com.smartplanner.model.Habit
+import com.smartplanner.model.HabitPlan
+import com.smartplanner.model.ProgressPoint
 import com.smartplanner.model.ProposalStatus
 import com.smartplanner.model.Repository
+import com.smartplanner.model.User
+import com.smartplanner.model.ai.AiFeedback
 import com.smartplanner.model.ai.coach.DefaultCoachTools
 import com.smartplanner.model.ai.coach.RuleBasedFallbackReviewer
 import com.smartplanner.model.ai.coach.WeeklyCoachAgent
@@ -45,13 +49,14 @@ class WeeklyCoachAgentTest {
                 title = "Meditate 20 mins",
                 trigger = "Morning",
                 minVersion = "1 deep breath",
-                anchorConfig = AnchorConfig(AnchorType.CLOCK_TIME)
+                aiReasoning = "Helps center focus",
+                anchorType = AnchorType.CLOCK_TIME
             )
         )
         fakeRepository.checkIns = listOf(
-            CheckInRecord("1", "h1", "2026-09-15", CheckInStatus.SKIPPED),
-            CheckInRecord("2", "h1", "2026-09-16", CheckInStatus.SKIPPED),
-            CheckInRecord("3", "h1", "2026-09-17", CheckInStatus.SKIPPED)
+            CheckIn("1", "h1", "2026-09-15", CheckInStatus.SKIPPED, null),
+            CheckIn("2", "h1", "2026-09-16", CheckInStatus.SKIPPED, null),
+            CheckIn("3", "h1", "2026-09-17", CheckInStatus.SKIPPED, null)
         )
 
         val review = fallbackReviewer.generateWeeklyReview(LocalDate.of(2026, 9, 21))
@@ -73,11 +78,12 @@ class WeeklyCoachAgentTest {
                 title = "Read 5 pages",
                 trigger = "Night",
                 minVersion = "1 page",
-                anchorConfig = AnchorConfig(AnchorType.HEADPHONES_PLUGGED)
+                aiReasoning = "Compound learning",
+                anchorType = AnchorType.HEADPHONES_CONNECTED
             )
         )
         fakeRepository.checkIns = (1..6).map {
-            CheckInRecord(it.toString(), "h2", "2026-09-${14 + it}", CheckInStatus.DONE)
+            CheckIn(it.toString(), "h2", "2026-09-${14 + it}", CheckInStatus.DONE, null)
         }
 
         val review = fallbackReviewer.generateWeeklyReview(LocalDate.of(2026, 9, 21))
@@ -91,7 +97,7 @@ class WeeklyCoachAgentTest {
     @Test
     fun `test agent conducts review gracefully offline with zero crash`() = runBlocking {
         fakeRepository.habits = listOf(
-            Habit(id = "h3", title = "Walk", trigger = "Noon", minVersion = "100 steps")
+            Habit(id = "h3", title = "Walk", trigger = "Noon", minVersion = "100 steps", aiReasoning = "Movement")
         )
         fakeRepository.checkIns = emptyList()
 
@@ -102,34 +108,53 @@ class WeeklyCoachAgentTest {
 
     @Test
     fun `test human-in-the-loop guarantee does not mutate repository until approved`() = runBlocking {
-        val originalAnchor = AnchorConfig(AnchorType.CLOCK_TIME)
         fakeRepository.habits = listOf(
-            Habit(id = "h4", title = "Yoga", trigger = "7am", anchorConfig = originalAnchor)
+            Habit(id = "h4", title = "Yoga", trigger = "7am", minVersion = "1 stretch", aiReasoning = "Flexibility", anchorType = AnchorType.CLOCK_TIME)
         )
         fakeRepository.checkIns = listOf(
-            CheckInRecord("1", "h4", "2026-09-18", CheckInStatus.SKIPPED),
-            CheckInRecord("2", "h4", "2026-09-19", CheckInStatus.SKIPPED)
+            CheckIn("1", "h4", "2026-09-18", CheckInStatus.SKIPPED, null),
+            CheckIn("2", "h4", "2026-09-19", CheckInStatus.SKIPPED, null)
         )
 
         val review = agent.conductWeeklyReview()
         // Ensure repository anchor was NOT changed behind the user's back
         val habitInRepo = fakeRepository.getHabitById("h4")
-        assertEquals(AnchorType.CLOCK_TIME, habitInRepo?.anchorConfig?.type)
+        assertEquals(AnchorType.CLOCK_TIME, habitInRepo?.anchorType)
         assertEquals(ProposalStatus.PENDING, review.proposedChanges.firstOrNull()?.status ?: ProposalStatus.PENDING)
     }
 
     private class FakeRepository : Repository {
         var habits: List<Habit> = emptyList()
-        var checkIns: List<CheckInRecord> = emptyList()
+        var checkIns: List<CheckIn> = emptyList()
 
-        override suspend fun getHabits(): List<Habit> = habits
-        override suspend fun getHabitById(id: String): Habit? = habits.find { it.id == id }
-        override suspend fun updateHabitAnchor(habitId: String, config: AnchorConfig) {
-            habits = habits.map { if (it.id == habitId) it.copy(anchorConfig = config) else it }
+        override fun isUserLoggedIn(): Flow<Boolean> = MutableStateFlow(true)
+        override fun loginDemoUser() {}
+        override fun logout() {}
+        override fun getCurrentUser(): Flow<User?> = MutableStateFlow(null)
+        override fun updateCurrentUser(name: String, email: String) {}
+        override fun getActivePlan(): Flow<HabitPlan?> = MutableStateFlow(null)
+        override fun getActiveHabits(): Flow<List<Habit>> = MutableStateFlow(habits)
+        override fun getAllPlans(): Flow<List<HabitPlan>> = MutableStateFlow(emptyList())
+        override fun createPlan(goals: List<String>, knownObstacles: String, dailyCommitmentMinutes: Int): HabitPlan {
+            return HabitPlan("1", goals, knownObstacles, dailyCommitmentMinutes, "today", habits)
         }
-        override suspend fun getCheckIns(): List<CheckInRecord> = checkIns
-        override suspend fun logCheckIn(record: CheckInRecord) { checkIns = checkIns + record }
-        override fun getHabitsFlow(): Flow<List<Habit>> = MutableStateFlow(habits)
-        override fun getCheckInsFlow(): Flow<List<CheckInRecord>> = MutableStateFlow(checkIns)
+        override fun deletePlan(planId: String) {}
+        override fun setActivePlan(planId: String) {}
+        override fun getCheckInsForDate(date: String): Flow<List<CheckIn>> = MutableStateFlow(checkIns)
+        override fun saveCheckIn(habitId: String, date: String, status: CheckInStatus, note: String?) {
+            checkIns = checkIns + CheckIn("new", habitId, date, status, note)
+        }
+        override fun updateHabitAnchor(habitId: String, anchorType: AnchorType, anchorConfig: AnchorConfig?) {
+            habits = habits.map { if (it.id == habitId) it.copy(anchorType = anchorType, anchorConfig = anchorConfig) else it }
+        }
+        override fun recordHabitReminderFired(habitId: String, timestamp: Long, dateStr: String) {}
+        override fun getHabitById(habitId: String): Habit? = habits.find { it.id == habitId }
+        override fun updateHabit(habit: Habit) {
+            habits = habits.map { if (it.id == habit.id) habit else it }
+        }
+        override fun getProgressPoints(): Flow<List<ProgressPoint>> = MutableStateFlow(emptyList())
+        override fun getLatestAiFeedback(): Flow<AiFeedback?> = MutableStateFlow(null)
+        override fun saveAiFeedback(feedback: AiFeedback) {}
+        override fun dismissAiFeedback() {}
     }
 }
