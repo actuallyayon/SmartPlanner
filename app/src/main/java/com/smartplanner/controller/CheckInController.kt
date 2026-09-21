@@ -2,9 +2,12 @@ package com.smartplanner.controller
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.smartplanner.model.CheckIn
 import com.smartplanner.model.CheckInStatus
 import com.smartplanner.model.Habit
 import com.smartplanner.model.Repository
+import com.smartplanner.model.ai.AiFeedback
+import com.smartplanner.model.ai.AiFeedbackEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +24,7 @@ data class CheckInUiState(
     val statuses: Map<String, CheckInStatus> = emptyMap(), // habitId -> Status
     val notes: Map<String, String> = emptyMap(), // habitId -> Note
     val showSuccess: Boolean = false,
+    val aiFeedback: AiFeedback? = null,
     val isLoading: Boolean = false
 )
 
@@ -28,6 +32,8 @@ data class CheckInUiState(
 class CheckInController @Inject constructor(
     private val repository: Repository
 ) : ViewModel() {
+
+    private val feedbackEngine = AiFeedbackEngine()
 
     private val _uiState = MutableStateFlow(CheckInUiState())
     val uiState: StateFlow<CheckInUiState> = _uiState.asStateFlow()
@@ -81,6 +87,7 @@ class CheckInController @Inject constructor(
         viewModelScope.launch {
             val dateStr = LocalDate.now().toString()
             val state = _uiState.value
+            val recordedCheckIns = mutableListOf<CheckIn>()
             
             state.habits.forEach { habit ->
                 val status = state.statuses[habit.id]
@@ -92,10 +99,26 @@ class CheckInController @Inject constructor(
                         status = status,
                         note = if (note.isNullOrBlank()) null else note
                     )
+                    recordedCheckIns.add(
+                        CheckIn(
+                            id = "${dateStr}_${habit.id}",
+                            habitId = habit.id,
+                            date = dateStr,
+                            status = status,
+                            note = note
+                        )
+                    )
                 }
             }
             
-            _uiState.value = _uiState.value.copy(showSuccess = true)
+            // Generate AI Motivational Review
+            val feedback = feedbackEngine.generateFeedback(state.habits, recordedCheckIns)
+            repository.saveAiFeedback(feedback)
+
+            _uiState.value = _uiState.value.copy(
+                showSuccess = true,
+                aiFeedback = feedback
+            )
         }
     }
 }
